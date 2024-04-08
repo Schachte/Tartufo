@@ -210,7 +210,6 @@ const lexemeHandlers = [
   NumberHandler,
   LetHandler,
   ConstHandler,
-  SymbolHandler,
 ];
 
 /**
@@ -236,7 +235,9 @@ const EvalToken = (input: string[]): ParseFunc | undefined => {
       return (_: string[]) => token(lexeme, TokenTypeReverseLookup[lexeme]);
   }
 
-  for (let handler of lexemeHandlers) {
+  // SymbolHandler must always be evaluated last as to not conflict with reserved
+  // keywords. As such, we can force it to be last to avoid any future mistakes.
+  for (let handler of [...lexemeHandlers, SymbolHandler]) {
     const parseFn = handler.satisfies(input);
     if (!parseFn) continue;
     return parseFn;
