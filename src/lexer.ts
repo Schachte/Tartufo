@@ -5,7 +5,8 @@ export enum TokenType {
   Teq = "TRIPLE_EQUAL",
   Number = "NUMBER",
   Add = "ADD",
-  Sub = "SUBTRACT",
+  Minus = "MINUS",
+  DMinus = "DOUBLE_MINUS",
   Div = "DIVISION",
   Mult = "MULTIPLICATION",
   Exp = "EXPONENT",
@@ -19,7 +20,8 @@ const TokenTypeReverseLookup = {
   "=": TokenType.Eq,
   "==": TokenType.Deq,
   "+": TokenType.Add,
-  "-": TokenType.Sub,
+  "-": TokenType.Minus,
+  "--": TokenType.DMinus,
   "/": TokenType.Div,
   "*": TokenType.Mult,
   "^": TokenType.Exp,
@@ -152,7 +154,7 @@ const EqualHandler: TokenizeHandler = {
 
 const LetHandler: TokenizeHandler = {
   satisfies(input: string[]): ParseFunc | undefined {
-    if (input.length < 3) return undefined;
+    if (input.length < "let".length) return undefined;
     // slicing between satisfies and parse is redundant, but also constant time, so w/e.
     // Might just refactor the complexity of this interface
     const potentialAssign = input.slice(0, 3).join("");
@@ -200,13 +202,42 @@ const ConstHandler: TokenizeHandler = {
     if (!isConst(input)) {
       throw new Error("Expected 'const' token");
     }
-    return token(input.splice(0, 5).join(""), TokenType.Const);
+    return token(input.splice(0, "const".length).join(""), TokenType.Const);
+  },
+};
+
+const MinusHandler: TokenizeHandler = {
+  satisfies(input: string[]): ParseFunc | undefined {
+    return input[0] === "-" ? this.parse : undefined;
+  },
+
+  parse(input: string[]): Token {
+    let lexeme = "";
+    const minusCount = input.slice(0, 2).filter((char) => char === "-").length;
+
+    if (minusCount > 0 && minusCount <= 3) {
+      lexeme = input.splice(0, minusCount).join("");
+    }
+
+    let tokenType: TokenType | undefined;
+    switch (lexeme) {
+      case "-":
+        tokenType = TokenType.Minus;
+        break;
+      case "--":
+        tokenType = TokenType.DMinus;
+        break;
+      default:
+        return undefined;
+    }
+    return token(lexeme, tokenType);
   },
 };
 
 const lexemeHandlers = [
   SpaceHandler,
   EqualHandler,
+  MinusHandler,
   NumberHandler,
   LetHandler,
   ConstHandler,
@@ -228,7 +259,6 @@ const EvalToken = (input: string[]): ParseFunc | undefined => {
     // TODO: This might fail for exponents
     case "*":
     case "+":
-    case "-":
     case "/":
     case "_":
       lexeme = input.shift();
