@@ -1,3 +1,21 @@
+/**
+ * Token is the smallest unit of valid syntax in our language.
+ * We might have something like "**" which would have a value of "**"
+ * as the literal and the type would be "Exp" to represent exponent.
+ */
+export interface Token {
+  value: string | undefined;
+  type: TokenType;
+}
+
+type ParseFunc = (input: string[]) => Token | undefined;
+interface TokenizeHandler {
+  // parse handles generating the token and increment the current lexer position
+  parse?: ParseFunc;
+  // satisfies will evaluate if the current token should be ran through a parse function
+  satisfies: (input: string[]) => ParseFunc | undefined;
+}
+
 export enum TokenType {
   Symbol = "SYMBOL",
   Eq = "EQUAL",
@@ -30,24 +48,6 @@ const TokenTypeReverseLookup: Record<string, TokenType> = {
   const: TokenType.Const,
   let: TokenType.Let,
 };
-
-/**
- * Token is the smallest unit of valid syntax in our language.
- * We might have something like "**" which would have a value of "**"
- * as the literal and the type would be "Exp" to represent exponent.
- */
-export interface Token {
-  value: string | undefined;
-  type: TokenType;
-}
-
-type ParseFunc = (input: string[]) => Token | undefined;
-interface TokenizeHandler {
-  // parse handles generating the token and increment the current lexer position
-  parse?: ParseFunc;
-  // satisfies will evaluate if the current token should be ran through a parse function
-  satisfies: (input: string[]) => ParseFunc | undefined;
-}
 
 export class Lexer {
   private input: string[];
