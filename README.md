@@ -52,5 +52,5 @@ AST: {
     "literal": "sup"
   }
 }
-Serialized output: let test = sup;
+Serialized output: let test = 'sup';
 ```

@@ -68,7 +68,7 @@ export class Parser {
     return {
       type: "StringExpression",
       literal: expressionValue,
-      debug: (): string => expressionValue,
+      debug: (): string => `'${expressionValue}'`,
     };
   }
 
