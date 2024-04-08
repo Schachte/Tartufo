@@ -1,6 +1,9 @@
 import { Token, TokenType } from "./lexer";
 
-type expressionType = "BinaryExpression" | "NumberExpression";
+type expressionType =
+  | "BinaryExpression"
+  | "NumberExpression"
+  | "StringExpression";
 type statementType =
   | "IfStatement"
   | "LetStatement"
@@ -14,7 +17,7 @@ export interface Program extends Node {
 
 export interface Node {
   type: expressionType | statementType | "Program";
-  toString(): string;
+  debug?(): string;
 }
 
 export interface Expression extends Node {
@@ -37,6 +40,11 @@ export interface NumberExpression extends Expression {
   literal: Number;
 }
 
+export interface StringExpression extends Expression {
+  type: expressionType;
+  literal: string;
+}
+
 export class Parser {
   private tokens: Array<Token>;
   private statements: Array<Statement>;
@@ -47,9 +55,20 @@ export class Parser {
   }
 
   parseNumberExpression(): NumberExpression {
+    const expressionValue = this.consumeCurrentToken().value;
     return {
       type: "NumberExpression",
-      literal: parseInt(this.consumeCurrentToken().value),
+      literal: parseInt(expressionValue),
+      debug: (): string => expressionValue,
+    };
+  }
+
+  parseStringExpression(): StringExpression {
+    const expressionValue = this.consumeCurrentToken().value;
+    return {
+      type: "StringExpression",
+      literal: expressionValue,
+      debug: (): string => expressionValue,
     };
   }
 
@@ -57,6 +76,8 @@ export class Parser {
     switch (this.getCurrentToken().type) {
       case TokenType.Number:
         return this.parseNumberExpression();
+      case TokenType.String:
+        return this.parseStringExpression();
     }
   }
 
@@ -90,8 +111,12 @@ export class Parser {
       type: "LetStatement",
       identifier: expectedSymbol.value,
       expression,
-      toString: (): string => {
-        return `let ${expectedSymbol.value} = ${expression.toString()};`;
+      debug: (): string => {
+        return `let ${expectedSymbol.value} = ${
+          expression.debug
+            ? expression.debug()
+            : `<ERROR: node: ${expression.type} has not yet implemented debug()>`
+        };`;
       },
     };
   }
@@ -116,9 +141,6 @@ export class Parser {
       switch (currToken.type) {
         case TokenType.Let:
           this.statements.push(this.parseLetStatement());
-          continue;
-        case TokenType.Number:
-          this.statements.push(this.parseExpressionStatement());
           continue;
         default:
           throw new Error(`parser hasn't implemented token: ${currToken}`);
