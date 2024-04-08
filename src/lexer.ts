@@ -10,9 +10,11 @@ export interface Token {
 
 type ParseFunc = (input: string[]) => Token | undefined;
 interface TokenizeHandler {
-  // parse handles generating the token and increment the current lexer position
+  // parse handles generating the token and increment the current lexer position.
+  // If parse is called, it's assumed that the input being passed in is valid for that
+  // parse function, otherwise an error is thrown.
   parse?: ParseFunc;
-  // satisfies will evaluate if the current token should be ran through a parse function
+  // satisfies will evaluate if the current token should be ran through a parse function.
   satisfies: (input: string[]) => ParseFunc | undefined;
 }
 
