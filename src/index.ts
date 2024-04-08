@@ -1,7 +1,8 @@
-import { tokenize } from "./lexer";
+import { Lexer } from "./lexer";
 
-const tokens = tokenize(`const 
+const sourceCode = `const 
 letter const let letter let - -- === my_data = 5  ==   _ *  2; const;
-hi
-`);
-console.log(tokens);
+hi`;
+
+const lexer = new Lexer(sourceCode);
+const tokens = lexer.tokenize();
