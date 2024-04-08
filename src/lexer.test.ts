@@ -16,6 +16,9 @@ describe("lexer performining tokenization", () => {
         type: TokenType.Number,
         value: "5",
       },
+      {
+        type: TokenType.EOF,
+      },
     ];
     expect(lexer.tokenize()).toStrictEqual(expectedTokens);
   });
@@ -42,6 +45,9 @@ describe("lexer performining tokenization", () => {
       {
         type: TokenType.Semicolon,
         value: ";",
+      },
+      {
+        type: TokenType.EOF,
       },
     ];
     const result = lexer.tokenize();
@@ -71,6 +77,9 @@ describe("lexer performining tokenization", () => {
         type: TokenType.Semicolon,
         value: ";",
       },
+      {
+        type: TokenType.EOF,
+      },
     ];
     const result = lexer.tokenize();
     expect(result).toStrictEqual(expectedTokens);
@@ -98,6 +107,9 @@ describe("lexer performining tokenization", () => {
       {
         type: TokenType.Semicolon,
         value: ";",
+      },
+      {
+        type: TokenType.EOF,
       },
     ];
     const result = () => lexer.tokenize();

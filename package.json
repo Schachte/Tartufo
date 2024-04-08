@@ -7,7 +7,8 @@
     "start": "tsc && node out/index.js",
     "prestart": "npm run build",
     "build": "tsc",
-    "test": "jest --watch"
+    "test_watch": "jest --watch",
+    "test": "jest"
   },
   "keywords": [],
   "author": "",

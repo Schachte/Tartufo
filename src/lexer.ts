@@ -4,7 +4,7 @@
  * as the literal and the type would be "Exp" to represent exponent.
  */
 export interface Token {
-  value: string | undefined;
+  value?: string | undefined;
   type: TokenType;
   error?(): Error | undefined;
 }
@@ -106,6 +106,7 @@ export class Lexer {
       if (tokenOrErr) this.tokens.push(tokenOrErr);
     }
 
+    this.tokens.push(Lexer.generateToken(undefined, TokenType.EOF));
     return this.tokens;
   }
 
@@ -146,6 +147,9 @@ export class Lexer {
   };
 
   static generateToken(value: string | undefined, type: TokenType): Token {
+    if (!value) {
+      return { type };
+    }
     return {
       value,
       type,

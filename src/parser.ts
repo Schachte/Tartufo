@@ -133,10 +133,7 @@ export class Parser {
   }
 
   parse(): Program {
-    while (
-      this.getCurrentToken() &&
-      this.getCurrentToken().type != TokenType.EOF
-    ) {
+    while (this.getCurrentToken().type != TokenType.EOF) {
       const currToken = this.consumeCurrentToken();
       switch (currToken.type) {
         case TokenType.Let:
