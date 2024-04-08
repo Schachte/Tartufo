@@ -6,19 +6,22 @@
 export interface Token {
   value: string | undefined;
   type: TokenType;
+  error?(): Error | undefined;
 }
 
-type ParseFunc = (input: string[]) => Token | undefined;
+type ParseFunc = (input: string[]) => Token | Error;
 interface TokenizeHandler {
+  error?(): Error;
   // parse handles generating the token and increment the current lexer position.
   // If parse is called, it's assumed that the input being passed in is valid for that
   // parse function, otherwise an error is thrown.
-  parse?: ParseFunc;
+  parse?: ParseFunc | Error;
   // satisfies will evaluate if the current token should be ran through a parse function.
   satisfies: (input: string[]) => ParseFunc | undefined;
 }
 
 export enum TokenType {
+  EOF = "EOF",
   Symbol = "SYMBOL",
   Eq = "EQUAL",
   Deq = "DOUBLE_EQUAL",
@@ -34,10 +37,15 @@ export enum TokenType {
   Let = "LET",
   Underscore = "UNDERSCORE",
   Semicolon = "SEMICOLON",
+  DblQuote = "DOUBLE_QUOTE",
+  SnglQuote = "SINGLE_QUOTE",
+  String = "STRING",
 }
 
 const TokenTypeReverseLookup: Record<string, TokenType> = {
   "=": TokenType.Eq,
+  '"': TokenType.DblQuote,
+  "'": TokenType.SnglQuote,
   "==": TokenType.Deq,
   "+": TokenType.Add,
   "-": TokenType.Minus,
@@ -59,6 +67,7 @@ export class Lexer {
     this.input = input.split("");
     this.tokens = new Array<Token>();
     this.lexemeHandlers = [
+      QuoteHandler,
       SpaceHandler,
       EqualHandler,
       MinusHandler,
@@ -90,8 +99,11 @@ export class Lexer {
       // If the lexer thinks there might be a match on the character sequence
       // then we attempt to generate the associated token. If no token is created,
       // then we continue parsing
-      const token = tokenParser(this.input);
-      if (token) this.tokens.push(token);
+      const tokenOrErr = tokenParser(this.input);
+      if (tokenOrErr instanceof Error) {
+        throw tokenOrErr;
+      }
+      if (tokenOrErr) this.tokens.push(tokenOrErr);
     }
 
     return this.tokens;
@@ -106,7 +118,7 @@ export class Lexer {
    * @param input character array of input from the source file
    * @returns function for generating a token from the given input
    */
-  private evalToken = (): ParseFunc | undefined => {
+  private evalToken = (): ParseFunc => {
     let lexeme;
     // Handle single byte lexemes first as they're easiest to parse
     switch (this.input[0]) {
@@ -130,7 +142,7 @@ export class Lexer {
       if (!parseFn) continue;
       return parseFn;
     }
-    return undefined;
+    throw new Error(`unable to lex token from ${this.input[0]}`);
   };
 
   static generateToken(value: string | undefined, type: TokenType): Token {
@@ -159,12 +171,18 @@ export class Lexer {
 // Some useful utility functions for lexical analysis
 const isAlpha = (char: string): boolean => /[a-zA-Z]/.test(char);
 const isDigit = (char: string): boolean => /\d/.test(char);
+const isWhitespace = (char: string): boolean => /\s/.test(char);
 const isUnderscore = (char: string): boolean => char === "_";
 const isSymbol = (char: string): boolean => isAlpha(char) || isUnderscore(char);
+const matchBetweenQuotes = (str: string): string | null => {
+  const regex = /\"(.*?)\"|'(.*?)'/;
+  const match = str.match(regex);
+  return match ? match[1] || match[2] : null;
+};
 
 const SpaceHandler: TokenizeHandler = {
   satisfies(input: string[]): ParseFunc | undefined {
-    if (input.length > 0 && Lexer.charIsAny(input[0], "\r", "\t", "\n", " ")) {
+    if (input.length > 0 && isWhitespace(input[0])) {
       return this.parse;
     }
     return undefined;
@@ -173,6 +191,33 @@ const SpaceHandler: TokenizeHandler = {
     while (SpaceHandler.satisfies(input)) {
       input.shift();
     }
+  },
+};
+
+const QuoteHandler: TokenizeHandler = {
+  satisfies(input: string[]): ParseFunc | undefined {
+    return input[0] == '"' || input[0] == "'" ? this.parse : undefined;
+  },
+  parse(input: string[]): Token | Error {
+    const quote = Lexer.getCharAndRemove(input);
+    let identifierValue = "";
+    while (input.length > 0 && input[0] != quote) {
+      identifierValue += input.shift();
+    }
+    const endQuote =
+      input.length > 0 ? Lexer.getCharAndRemove(input) : undefined;
+    if (endQuote !== quote) {
+      return new Error(
+        `missing matching end quote of type: "${quote}", but got "${
+          identifierValue[identifierValue.length - 1]
+        }" Maybe you forgot to close the value: "${identifierValue.substring(
+          0,
+          identifierValue.length - 1
+        )}"`
+      );
+    }
+
+    return Lexer.generateToken(identifierValue, TokenType.String);
   },
 };
 
@@ -244,7 +289,7 @@ const SymbolHandler: TokenizeHandler = {
   },
 
   parse(input: string[]): Token {
-    const symbolChars: string[] = [];
+    const symbolChars: string[] = [Lexer.getCharAndRemove(input)];
     while (input.length > 0 && isSymbol(input[0])) {
       symbolChars.push(Lexer.getCharAndRemove(input));
     }
@@ -278,7 +323,7 @@ const MinusHandler: TokenizeHandler = {
     return input[0] === "-" ? this.parse : undefined;
   },
 
-  parse(input: string[]): Token {
+  parse(input: string[]): Token | Error {
     let lexeme = "";
     const minusCount = input.slice(0, 2).filter((char) => char === "-").length;
 
@@ -295,7 +340,9 @@ const MinusHandler: TokenizeHandler = {
         tokenType = TokenType.DMinus;
         break;
       default:
-        return undefined;
+        return new Error(
+          `unexpected token received in when parsing "-" and got: ${lexeme}`
+        );
     }
     return Lexer.generateToken(lexeme, tokenType);
   },
