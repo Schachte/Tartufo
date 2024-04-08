@@ -100,6 +100,9 @@ export function tokenize(source: string): Token[] {
       throw new Error(`No valid parser function for the token: ${splitSrc[0]}`);
     }
 
+    // If the lexer thinks there might be a match on the character sequence
+    // then we attempt to generate the associated token. If no token is created,
+    // then we continue parsing
     const token = tokenParser(splitSrc);
     if (token) tokens.push(token);
   }
@@ -155,10 +158,14 @@ const EqualHandler: TokenizeHandler = {
 const LetHandler: TokenizeHandler = {
   satisfies(input: string[]): ParseFunc | undefined {
     if (input.length < "let".length) return undefined;
-    // slicing between satisfies and parse is redundant, but also constant time, so w/e.
-    // Might just refactor the complexity of this interface
-    const potentialAssign = input.slice(0, 3).join("");
-    return potentialAssign === "let" ? this.parse.bind(this) : undefined;
+    const regex = /^(let)\s.*/;
+
+    // evaluate if something starting with "let" is the reserved keyword
+    // versus a symbol
+    const match = input.slice(0, 4).join("").match(regex);
+    return match && match[1].length === "let".length
+      ? this.parse.bind(this)
+      : undefined;
   },
   parse(input: string[]): Token {
     return token(input.splice(0, 3).join(""), TokenType.Let);
@@ -195,7 +202,15 @@ const SymbolHandler: TokenizeHandler = {
 
 const ConstHandler: TokenizeHandler = {
   satisfies(input: string[]): ParseFunc | undefined {
-    return isConst(input) ? this.parse : undefined;
+    if (input.length < "const".length) return undefined;
+    const regex = /^(const)\s.*/;
+
+    // evaluate if something starting with "let" is the reserved keyword
+    // versus a symbol
+    const match = input.slice(0, 6).join("").match(regex);
+    return match && match[1].length === "const".length
+      ? this.parse.bind(this)
+      : undefined;
   },
 
   parse(input: string[]): Token {
@@ -247,6 +262,7 @@ const lexemeHandlers = [
  * EvalToken will evaluate single and multi-digit character sequences
  * to determine if and when they should be parsed with the goal of creating
  * a valid token. These tokens will later be used for AST construction when parsing.
+ * The result here is the function that will be used to parse if there is a match.
  *
  * @param input character array of input from the source file
  * @returns function for generating a token from the given input
@@ -268,6 +284,8 @@ const EvalToken = (input: string[]): ParseFunc | undefined => {
   // SymbolHandler must always be evaluated last as to not conflict with reserved
   // keywords. As such, we can force it to be last to avoid any future mistakes.
   for (let handler of [...lexemeHandlers, SymbolHandler]) {
+    // If the current token(s) match some expression, we grab the parse
+    // function for it.
     const parseFn = handler.satisfies(input);
     if (!parseFn) continue;
     return parseFn;
