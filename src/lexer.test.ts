@@ -55,7 +55,7 @@ describe("lexer performining tokenization", () => {
   });
 
   it("should handle double quoted strings", () => {
-    const lexer = new Lexer('const banana = "hello mom";');
+    const lexer = new Lexer('const banana = "hello mom2";');
     const expectedTokens: Array<Token> = [
       {
         type: TokenType.Const,
@@ -71,7 +71,7 @@ describe("lexer performining tokenization", () => {
       },
       {
         type: TokenType.String,
-        value: "hello mom",
+        value: "hello mom2",
       },
       {
         type: TokenType.Semicolon,

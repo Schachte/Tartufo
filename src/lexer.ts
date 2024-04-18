@@ -4,7 +4,7 @@
  * as the literal and the type would be "Exp" to represent exponent.
  */
 export interface Token {
-  value?: string | undefined;
+  value?: string;
   type: TokenType;
   error?(): Error | undefined;
 }

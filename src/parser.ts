@@ -26,7 +26,7 @@ export interface Expression extends Node {
 
 export interface Statement extends Node {
   type: statementType;
-  expression: Expression | Expression[];
+  expression: Expression;
 }
 
 export interface LetStatement extends Statement {
@@ -45,9 +45,36 @@ export interface StringExpression extends Expression {
   literal: string;
 }
 
+export interface BinaryExpression extends Expression {
+  type: expressionType;
+  leftOperand: Expression;
+  rightOperand: Expression;
+  operator: Token;
+}
+
+// Based on rules of PEMDAS (Please excuse my dear Aunt Sally ;)
+const bindingPowerLookup = {
+  [TokenType.Minus]: 1,
+  [TokenType.Add]: 1,
+  [TokenType.Div]: 2,
+} as Record<TokenType, number>;
+
 export class Parser {
   private tokens: Array<Token>;
   private statements: Array<Statement>;
+
+  // Prefix handling using "Pratt parsing". Each function is assumed
+  // to consume the current token!
+  nullDenotationFn = {
+    [TokenType.Number]: this.parseNumberExpression.bind(this),
+    [TokenType.String]: this.parseStringExpression.bind(this),
+  } as Record<TokenType, () => Expression>;
+
+  leftDenotationFn = {
+    [TokenType.Add]: this.parseBinaryExpression.bind(this),
+    [TokenType.Minus]: this.parseBinaryExpression.bind(this),
+    [TokenType.Div]: this.parseBinaryExpression.bind(this),
+  } as Record<TokenType, (l: Expression, bp: number) => Expression>;
 
   constructor(tokens: Array<Token>) {
     this.tokens = tokens;
@@ -72,16 +99,55 @@ export class Parser {
     };
   }
 
-  parseExpression(): Expression | any {
-    switch (this.getCurrentToken().type) {
-      case TokenType.Number:
-        return this.parseNumberExpression();
-      case TokenType.String:
-        return this.parseStringExpression();
+  parseBinaryExpression(
+    leftOperand: Expression,
+    operator: Token,
+    bindingPower: number
+  ): BinaryExpression {
+    // eat the operator before recursing deeper since we already have both a reference
+    // to the operator as well as the operators binding power in this callstack.
+    const currOperator = this.consumeCurrentToken();
+    const rightOperand = this.parseExpression(bindingPower);
+    return {
+      type: "BinaryExpression",
+      leftOperand,
+      rightOperand,
+      operator: currOperator,
+      debug: (): string =>
+        `${leftOperand.debug()} ${currOperator.value} ${rightOperand.debug()}`,
+    };
+  }
+
+  // 10 + 9 * 2
+  parseExpression(bindingPower: number): Expression {
+    // get function to parse the prefix expression
+    const nullDenotationFn = this.nullDenotationFn[this.getCurrentToken().type];
+    if (!nullDenotationFn) {
+      throw new Error(
+        `invalid expression. Expected prefix expression for ${this.getCurrentToken()}, but it was missing from the nullDenotationFn map`
+      );
     }
+
+    // if number, get parser for number and increment to operator
+    let left = nullDenotationFn();
+    while (
+      // get the parse function for handling a particular operator
+      this.leftDenotationFn[this.getCurrentToken().type] &&
+      bindingPowerLookup[this.getCurrentToken().type] >= bindingPower
+    ) {
+      const leftDenotationFn =
+        this.leftDenotationFn[this.getCurrentToken().type];
+      left = leftDenotationFn(
+        left,
+        bindingPowerLookup[this.getCurrentToken().type]
+      );
+    }
+    return left;
   }
 
   parseLetStatement(): LetStatement {
+    // eat the let
+    this.consumeCurrentToken();
     const expectedSymbol = this.consumeCurrentToken();
     if (!expectedSymbol || expectedSymbol.type != TokenType.Symbol) {
       throw new Error(
@@ -96,7 +162,7 @@ export class Parser {
       );
     }
 
-    const expression = this.parseExpression();
+    const expression = this.parseExpression(0);
     const expectedEndOfExpression = this.consumeCurrentToken();
     if (
       !expectedEndOfExpression ||
@@ -122,22 +188,22 @@ export class Parser {
   }
 
   parseExpressionStatement(): Statement | any {
-    if (this.getCurrentToken().type != TokenType.Eq) {
-      throw new Error(
-        `invalid let statement. Expected ${TokenType.Eq} and got ${
-          this.getCurrentToken().type
-        }`
-      );
-    }
-    this.consumeCurrentToken();
+    return this.parseExpression(0);
   }
 
   parse(): Program {
     while (this.getCurrentToken().type != TokenType.EOF) {
-      const currToken = this.consumeCurrentToken();
+      const currToken = this.getCurrentToken();
       switch (currToken.type) {
+        case TokenType.EOF:
+          this.consumeCurrentToken();
+          break;
         case TokenType.Let:
           this.statements.push(this.parseLetStatement());
+          continue;
+        case TokenType.String:
+        case TokenType.Number:
+          this.statements.push(this.parseExpressionStatement());
           continue;
         default:
           throw new Error(`parser hasn't implemented token: ${currToken}`);
