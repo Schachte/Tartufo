@@ -57,6 +57,7 @@ const bindingPowerLookup = {
   [TokenType.Minus]: 1,
   [TokenType.Add]: 1,
   [TokenType.Div]: 2,
+  [TokenType.Mult]: 2,
 } as Record<TokenType, number>;
 
 export class Parser {
@@ -74,6 +75,7 @@ export class Parser {
     [TokenType.Add]: this.parseBinaryExpression.bind(this),
     [TokenType.Minus]: this.parseBinaryExpression.bind(this),
     [TokenType.Div]: this.parseBinaryExpression.bind(this),
+    [TokenType.Mult]: this.parseBinaryExpression.bind(this),
   } as Record<TokenType, (l: Expression, bp: number) => Expression>;
 
   constructor(tokens: Array<Token>) {
@@ -101,16 +103,17 @@ export class Parser {
 
   parseBinaryExpression(
     leftOperand: Expression,
-    operator: Token,
     bindingPower: number
   ): BinaryExpression {
     // eat the operator before recursing deeper since we already have both a reference
     // to the operator as well as the operators binding power in this callstack.
     const currOperator = this.consumeCurrentToken();
+    const newLeftOperand = leftOperand;
     const rightOperand = this.parseExpression(bindingPower);
+
     return {
       type: "BinaryExpression",
-      leftOperand,
+      leftOperand: newLeftOperand,
       rightOperand,
       operator: currOperator,
       debug: (): string =>
@@ -130,17 +133,15 @@ export class Parser {
 
     // if number, get parser for number and increment to operator
     let left = nullDenotationFn();
+    const currBindingPower = bindingPowerLookup[this.getCurrentToken().type];
     while (
       // get the parse function for handling a particular operator
       this.leftDenotationFn[this.getCurrentToken().type] &&
-      bindingPowerLookup[this.getCurrentToken().type] >= bindingPower
+      currBindingPower >= bindingPower
     ) {
       const leftDenotationFn =
         this.leftDenotationFn[this.getCurrentToken().type];
-      left = leftDenotationFn(
-        left,
-        bindingPowerLookup[this.getCurrentToken().type]
-      );
+      left = leftDenotationFn(left, currBindingPower);
     }
     return left;
   }
@@ -164,6 +165,7 @@ export class Parser {
 
     const expression = this.parseExpression(0);
     const expectedEndOfExpression = this.consumeCurrentToken();
+
     if (
       !expectedEndOfExpression ||
       expectedEndOfExpression.type != TokenType.Semicolon
@@ -206,7 +208,9 @@ export class Parser {
           this.statements.push(this.parseExpressionStatement());
           continue;
         default:
-          throw new Error(`parser hasn't implemented token: ${currToken}`);
+          throw new Error(
+            `parser hasn't implemented token: ${JSON.stringify(currToken)}`
+          );
       }
     }
     return {

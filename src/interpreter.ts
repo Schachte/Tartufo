@@ -55,6 +55,8 @@ export class Interpreter {
           expression as BinaryExpression
         );
     }
+
+    return env;
   }
 
   interpret() {
