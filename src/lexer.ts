@@ -40,6 +40,11 @@ export enum TokenType {
   DblQuote = "DOUBLE_QUOTE",
   SnglQuote = "SINGLE_QUOTE",
   String = "STRING",
+  Function = "FUNCTION",
+  LeftParen = "L_PAREN",
+  RightParen = "R_PAREN",
+  LeftBrace = "L_BRACE",
+  RightBrace = "R_BRACE",
 }
 
 const TokenTypeReverseLookup: Record<string, TokenType> = {
@@ -54,6 +59,11 @@ const TokenTypeReverseLookup: Record<string, TokenType> = {
   "*": TokenType.Mult,
   "^": TokenType.Exp,
   ";": TokenType.Semicolon,
+  "(": TokenType.LeftParen,
+  ")": TokenType.RightParen,
+  "{": TokenType.LeftBrace,
+  "}": TokenType.RightBrace,
+  fn: TokenType.Function,
   _: TokenType.Underscore,
   const: TokenType.Const,
   let: TokenType.Let,
@@ -74,6 +84,7 @@ export class Lexer {
       NumberHandler,
       LetHandler,
       ConstHandler,
+      FunctionHandler,
     ];
   }
 
@@ -124,11 +135,14 @@ export class Lexer {
     // Handle single byte lexemes first as they're easiest to parse
     switch (this.input[0]) {
       case ";":
-      // TODO: This might fail for exponents
       case "*":
       case "+":
       case "/":
       case "_":
+      case "(":
+      case ")":
+      case "{":
+      case "}":
         lexeme = this.input.shift();
         return (_: string[]) =>
           Lexer.generateToken(lexeme, TokenTypeReverseLookup[lexeme]);
@@ -174,6 +188,7 @@ export class Lexer {
 
 // Some useful utility functions for lexical analysis
 const isAlpha = (char: string): boolean => /[a-zA-Z]/.test(char);
+const isFunction = (char: string): boolean => /fn/.test(char);
 const isDigit = (char: string): boolean => /\d/.test(char);
 const isWhitespace = (char: string): boolean => /\s/.test(char);
 const isUnderscore = (char: string): boolean => char === "_";
@@ -349,5 +364,20 @@ const MinusHandler: TokenizeHandler = {
         );
     }
     return Lexer.generateToken(lexeme, tokenType);
+  },
+};
+
+const FunctionHandler: TokenizeHandler = {
+  satisfies(input: string[]): ParseFunc | undefined {
+    return input.length >= 2 && isFunction(input.slice(0, 2).join(""))
+      ? this.parse
+      : undefined;
+  },
+
+  parse(input: string[]): Token | Error {
+    return Lexer.generateToken(
+      input.splice(0, "fn".length).join(""),
+      TokenType.Function
+    );
   },
 };

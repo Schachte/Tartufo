@@ -87,6 +87,14 @@ describe("lexer performining tokenization", () => {
 
   it("fails when strings are unmatched", () => {
     const lexer = new Lexer('const banana = "hello mom;');
+    const result = () => lexer.tokenize();
+    expect(result).toThrow(
+      'missing matching end quote of type: """, but ' +
+        'got ";" Maybe you forgot to close the value: "hello mom"'
+    );
+  });
+  it("supports function keyword", () => {
+    const lexer = new Lexer(`const banana = fn`);
     const expectedTokens: Array<Token> = [
       {
         type: TokenType.Const,
@@ -101,21 +109,32 @@ describe("lexer performining tokenization", () => {
         value: "=",
       },
       {
-        type: TokenType.String,
-        value: "hello mom",
-      },
-      {
-        type: TokenType.Semicolon,
-        value: ";",
+        type: TokenType.Function,
+        value: "fn",
       },
       {
         type: TokenType.EOF,
       },
     ];
-    const result = () => lexer.tokenize();
-    expect(result).toThrow(
-      'missing matching end quote of type: """, but ' +
-        'got ";" Maybe you forgot to close the value: "hello mom"'
-    );
+    const result = lexer.tokenize();
+    expect(result).toStrictEqual(expectedTokens);
+  });
+  it("can lex parens", () => {
+    const lexer = new Lexer(`()`);
+    const expectedTokens: Array<Token> = [
+      {
+        type: TokenType.LeftParen,
+        value: "(",
+      },
+      {
+        type: TokenType.RightParen,
+        value: ")",
+      },
+      {
+        type: TokenType.EOF,
+      },
+    ];
+    const result = lexer.tokenize();
+    expect(result).toStrictEqual(expectedTokens);
   });
 });

@@ -1,5 +1,5 @@
 import { Lexer } from "./lexer";
-import { Parser } from "./parser";
+import { FunctionStatement, Parser } from "./parser";
 
 describe("parser constructs AST based on tokens", () => {
   it("should parse AST for simple arithmetic expression assignment", () => {
@@ -126,5 +126,100 @@ describe("parser constructs AST based on tokens", () => {
     const programNode = parser.parse();
     expect(programNode.body).toHaveLength(1);
     expect(programNode.body[0]).toMatchObject(expectedAST);
+  });
+
+  it("should parse AST for a basic function declaration with no body", () => {
+    const sourceCode = `fn customFunc() {
+    }`;
+
+    const expectedAST = {
+      type: "FunctionStatement",
+      identifier: "customFunc",
+    };
+
+    const lexer = new Lexer(sourceCode);
+    const tokens = lexer.tokenize();
+    const parser = new Parser(tokens);
+    const programNode = parser.parse();
+    expect(programNode.body).toHaveLength(1);
+    expect(programNode.body[0]).toMatchObject(expectedAST);
+  });
+
+  it("should parse AST for a basic function declaration with simple body", () => {
+    const sourceCode = `fn customFunc() {
+      let helloBody = 5 + 5;
+    }`;
+
+    const expectedAST = [
+      {
+        type: "LetStatement",
+        identifier: "helloBody",
+        expression: {
+          type: "BinaryExpression",
+          leftOperand: {
+            type: "NumberExpression",
+            literal: 5,
+          },
+          rightOperand: {
+            type: "NumberExpression",
+            literal: 5,
+          },
+          operator: {
+            value: "+",
+            type: "ADD",
+          },
+        },
+      },
+      {
+        type: "LetStatement",
+        identifier: "anotherThing",
+        expression: {
+          type: "BinaryExpression",
+          leftOperand: {
+            type: "BinaryExpression",
+            leftOperand: {
+              type: "NumberExpression",
+              literal: 5,
+            },
+            rightOperand: {
+              type: "NumberExpression",
+              literal: 4,
+            },
+            operator: {
+              value: "*",
+              type: "MULTIPLICATION",
+            },
+          },
+          rightOperand: {
+            type: "BinaryExpression",
+            leftOperand: {
+              type: "NumberExpression",
+              literal: 3,
+            },
+            rightOperand: {
+              type: "NumberExpression",
+              literal: 9,
+            },
+            operator: {
+              value: "/",
+              type: "DIVISION",
+            },
+          },
+          operator: {
+            value: "-",
+            type: "MINUS",
+          },
+        },
+      },
+    ];
+
+    const lexer = new Lexer(sourceCode);
+    const tokens = lexer.tokenize();
+    const parser = new Parser(tokens);
+    const programNode = parser.parse();
+    expect(programNode.body).toHaveLength(1);
+
+    // TODO: This test needs to include an evaluation against the AST, but currently, the match
+    // fails because I'm not evaluating debug functions, which makes this annoying to test.
   });
 });

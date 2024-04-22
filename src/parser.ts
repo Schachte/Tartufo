@@ -7,6 +7,7 @@ type expressionType =
 type statementType =
   | "IfStatement"
   | "LetStatement"
+  | "FunctionStatement"
   | "ConstStatement"
   | "ExpressionStatement";
 
@@ -26,13 +27,18 @@ export interface Expression extends Node {
 
 export interface Statement extends Node {
   type: statementType;
-  expression: Expression;
+  expression?: Expression;
 }
 
 export interface LetStatement extends Statement {
-  type: statementType;
-  expression: Expression;
   identifier: string;
+}
+
+export interface FunctionStatement extends Statement {
+  identifier: string;
+  body?: Statement[];
+  // parameters must be valid symbols
+  parameters?: string[];
 }
 
 export interface NumberExpression extends Expression {
@@ -146,6 +152,84 @@ export class Parser {
     return left;
   }
 
+  /**
+   * parseFunctionStatement will allow us to define functions via a declaration
+   * which defers slightly from assigning one to a variable in the form of a "function expression" which
+   * doesn't require nor support an identifier unlike a FunctionStatement.
+   *
+   * Usage:
+   * fn myFunc(param1, param2) {
+   *  <body>
+   * }
+   *
+   * Where the parameters to the statement are optional as well as the body which must contain a series
+   * of 0 or more statements.
+   */
+  parseFunctionStatement(): FunctionStatement {
+    // Eat the "fn" portion of the function
+    this.consumeCurrentToken();
+
+    // We now need to assume the presence of an identifier for the function. Lacking identifier
+    // means a unique function name is missing which should therefore produce an error as it violates
+    // the grammar.
+    const functionName = this.consumeCurrentToken();
+    if (!functionName || functionName.type != TokenType.Symbol) {
+      throw new Error(
+        `invalid function declaration. Expected ${TokenType.Symbol} and got ${functionName.type}`
+      );
+    }
+
+    const lParen = this.consumeCurrentToken();
+    if (!lParen || lParen.type != TokenType.LeftParen) {
+      throw new Error(
+        `invalid function declaration. Expected ${TokenType.LeftParen} and got ${lParen.type}`
+      );
+    }
+
+    // TODO: Implement parsing the parameters here
+
+    const rParen = this.consumeCurrentToken();
+    if (!rParen || rParen.type != TokenType.RightParen) {
+      throw new Error(
+        `invalid function declaration. Expected ${TokenType.RightParen} and got ${rParen.type}`
+      );
+    }
+
+    const lBrace = this.consumeCurrentToken();
+    if (!lBrace || lBrace.type != TokenType.LeftBrace) {
+      throw new Error(
+        `invalid function declaration. Expected ${TokenType.LeftBrace} and got ${lBrace.type}`
+      );
+    }
+
+    // Need to now parse the body as a series of independent statements. No surprise here
+    // as a function is just another program within a program! (Grammatically speaking).
+
+    let body = this.parseFunctionBody();
+
+    // signify the end of the function decl
+    const rBrace = this.consumeCurrentToken();
+    if (!rBrace || rBrace.type != TokenType.RightBrace) {
+      throw new Error(
+        `invalid function declaration. Expected ${TokenType.RightBrace} and got ${rBrace.type}`
+      );
+    }
+
+    return {
+      type: "FunctionStatement",
+      identifier: functionName.value,
+      body,
+      parameters: [] as string[],
+      debug: (): string => {
+        return `fn ${functionName.value}() {
+          ${([] as Statement[])
+            .map((bodyStatement) => bodyStatement.debug())
+            .forEach((statementDebug) => console.log(statementDebug))}
+        }`;
+      },
+    };
+  }
+
   parseLetStatement(): LetStatement {
     // eat the let
     this.consumeCurrentToken();
@@ -207,16 +291,52 @@ export class Parser {
         case TokenType.Number:
           this.statements.push(this.parseExpressionStatement());
           continue;
+        case TokenType.Function:
+          this.statements.push(this.parseFunctionStatement());
+          continue;
         default:
           throw new Error(
             `parser hasn't implemented token: ${JSON.stringify(currToken)}`
           );
       }
     }
+
     return {
       type: "Program",
       body: [...this.statements],
     };
+  }
+
+  // TODO: Obviously don't duplicate the core parsing logic
+  // as the only difference is the TokenType to signify the terminal
+  // node.
+  parseFunctionBody(): Statement[] {
+    const functionStatements = [] as Statement[];
+
+    while (this.getCurrentToken().type != TokenType.RightBrace) {
+      const currToken = this.getCurrentToken();
+      switch (currToken.type) {
+        case TokenType.EOF:
+          this.consumeCurrentToken();
+          break;
+        case TokenType.Let:
+          functionStatements.push(this.parseLetStatement());
+          continue;
+        case TokenType.String:
+        case TokenType.Number:
+          functionStatements.push(this.parseExpressionStatement());
+          continue;
+        case TokenType.Function:
+          functionStatements.push(this.parseFunctionStatement());
+          continue;
+        default:
+          throw new Error(
+            `parser hasn't implemented token: ${JSON.stringify(currToken)}`
+          );
+      }
+    }
+
+    return functionStatements;
   }
 
   consumeCurrentToken(): Token {
